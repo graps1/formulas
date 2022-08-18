@@ -67,7 +67,7 @@ class BuddyNode:
 	@cached_property
 	def var(self) -> str:
 		if self.node_id in [0,1]: return None
-		return self.model.__vars[self.model._bdd.bdd_var(self.node_id)]
+		return self.model.vars[self.model._bdd.bdd_var(self.node_id)]
 
 	@cached_property
 	def low(self) -> "BuddyNode": 
@@ -76,14 +76,6 @@ class BuddyNode:
 	@cached_property
 	def high(self) -> "BuddyNode": 
 		return BuddyNode(self.model, self.model._bdd.bdd_high(self.node_id))
-
-	@cached_property
-	def level(self) -> int: 
-		return self.model._bdd.bdd_level(self.node_id)
-
-	@cached_property
-	def get_size(self) -> int: 
-		return self.model._bdd.bdd_nodecount(self.node_id)
 
 	@cached_property
 	def satcount(self) -> int: 
@@ -97,7 +89,7 @@ class BuddyNode:
 	def var_profile(self) -> dict[str, int]:
 		# returns a variable-int-dictionary that counts how often variable nodes occur in this function
 		profile = self.model._bdd.bdd_varprofile(self.node_id)
-		return { var: count for var, count in zip(self.model.__vars, profile.contents ) }
+		return { var: count for var, count in zip(self.model.vars, profile.contents ) }
 
 	@cached_property 
 	def depends_on(self) -> set[str]:
@@ -118,7 +110,7 @@ class BuddyNode:
 		else:
 			self.model._bdd.bdd_fnsave(c_char_p(filename.encode("UTF-8")), self.node_id)
 			with open(filename+"v", "w") as f:
-				f.write("\n".join(self.model.__vars))
+				f.write("\n".join(self.model.vars))
 
 class Buddy:
 	def __init__(self, vars: list, lib="/usr/local/lib/libbdd.so") -> None: 
@@ -133,9 +125,13 @@ class Buddy:
 		self._bdd = buddy
 
 		# generate dict for varnames
-		self.__vars = vars
-		self.__name2var_id = { x : k for k, x in enumerate(self.__vars) }
+		self.__vars = tuple(vars)
+		self.__name2var_id = { x : k for k, x in enumerate(self.vars) }
 		self.__called_done = False
+
+	@property 
+	def vars(self) -> tuple[str]:
+		return self.__vars
 
 	@property
 	def called_done(self) -> bool:
@@ -143,11 +139,7 @@ class Buddy:
 
 	@property
 	def varcount(self) -> int: 
-		return len(self.__vars)
-
-	@property
-	def allocnum(self) -> int:
-		return self._bdd.bdd_getallocnum()
+		return len(self.vars)
 
 	@property 
 	def nodenum(self) -> int:

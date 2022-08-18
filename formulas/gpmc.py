@@ -31,6 +31,8 @@ class GPMC:
     def satcount(self, cnf: Union[Formula, list[list[int]]], \
                  debug=False, exists=set()):
         if isinstance(cnf, Formula):
+            if cnf == Formula.false: return 0
+            if cnf == Formula.true: return 1
             orig_vars = cnf.vars
             cnf, var2idx = cnf.tseitin() # create cnf encoding
             var2idx = { str(k): v for k,v in var2idx.items() } # map keys from Formula to str

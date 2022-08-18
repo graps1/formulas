@@ -10,6 +10,11 @@ def test_parsing():
     f5 = Formula.parse("x & (y & z)") 
     f6 = Formula.parse("x & y & z")
     assert f4 == f5 == f6
+    
+    x,y,z = Formula.parse("x"), Formula.parse("y"), Formula.parse("z")
+    f = (x & y | z) >> x
+    g = Formula.parse("(x & y | z) -> x")
+    assert f == g
 
 def test_simplification():
     formula_result_pairs = [

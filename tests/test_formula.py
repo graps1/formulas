@@ -62,3 +62,8 @@ def test_tseitin():
     Cf, Ax, Cg, Ay, Bz = sub2idx[f], sub2idx[x], sub2idx[g], sub2idx[y], sub2idx[z]
     expected = [{Cf}, {-Ax, -Cg, Cf}, {Ax, -Cf}, {Cg, -Cf}, {-Ay, -Bz, Cg}, {Ay, -Cg}, {Bz, -Cg}]
     assert set(map(frozenset, cnf)) == set(map(frozenset, expected))
+
+def test_renaming():
+    f = Formula.parse("x & y")
+    g = f.rename({"x": "y", "y": "x"})
+    assert g == Formula.parse("y & x")

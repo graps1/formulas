@@ -1,6 +1,7 @@
 from .parser import OPERATIONS, PRECEDENCE, ASSOCIATIVE, parse
 from functools import cached_property
 from typing import Union
+import copy
 
 class Formula:
     def __init__(self, op=None, c1=None, c2=None):
@@ -26,7 +27,7 @@ class Formula:
     def is_variable(self) -> bool: return self.__op == "V"
 
     @property
-    def op(self) -> str: return str(self.__op)
+    def op(self) -> str: return copy.copy(self.__op)
 
     @property
     def c1(self) -> Union["Formula", str]: return self.__c1
@@ -35,14 +36,14 @@ class Formula:
     def c2(self) -> Union["Formula", str]: return self.__c2
 
     @property 
-    def children(self) -> list[Union["Formula", str]]: return self.__children
+    def children(self) -> list[Union["Formula", str]]: return copy.copy(self.__children)
 
     @classmethod
     def parse(self, formula: str) -> "Formula":
         def rec(tree):
-            op = tree[0]
-            if op in ["C", "V"]: return Formula(op, *tree[1:])
-            else: return Formula(op, *( rec(c) for c in tree[1:] ) )
+            op, children = tree[0], tree[1:]
+            if op in ["C", "V"]: return Formula(op, *children)
+            else: return Formula(op, *map(rec, children) )
         return rec(parse(formula))
 
     def __repr__(self):
@@ -72,7 +73,7 @@ class Formula:
     def simplify(self) -> "Formula":
         # removes occurrences of 0s and 1s
         if self.is_variable or self.is_constant:
-            return self 
+            return copy.copy(self)
         if self.op == "~":
             sub = self.c1.simplify()
             if sub == Formula.zero: return Formula.one
@@ -115,7 +116,7 @@ class Formula:
 
     def cofactor(self, var : str, val : bool) -> "Formula":
         if self.op == "V" and self.c1 == var: return Formula.one if val else Formula.zero
-        elif self.op in ["V", "C"]: return self
+        elif self.op in ["V", "C"]: return copy.copy(self)
         else: return Formula(self.op, *(c.cofactor(var, val) for c in self.__children))
          
     def __and__(self, other : "Formula") -> "Formula": return Formula("&", self, other)
@@ -135,8 +136,16 @@ class Formula:
 
     def flip(self, var : str) -> "Formula":
         if self.op == "V" and self.c1 == var: return Formula("~", self)
-        elif self.op in ["V", "C"]: return self
+        elif self.op in ["V", "C"]: return copy.copy(self)
         else: return Formula(self.op, *(c.flip(var) for c in self.__children))
+    
+    def rename(self, d: dict):
+        if self.op == "V" and self.c1 in d: return Formula("V", d[self.c1])
+        elif self.op in ["V", "C"]: return copy.copy(self)
+        else: return Formula(self.op, *(c.rename(d) for c in self.__children))
+
+    def __copy__(self) -> "Formula":
+        return Formula(self.op.copy(), *(c.copy() for c in self.children))
 
     def __hash__(self) -> int:
         return self.__repr__().__hash__()
@@ -183,42 +192,6 @@ class Formula:
                 else:
                     raise Exception(f"operation {sub.op} unknown!")
         return cnf, vars2idx
-
-    # def add_flip_vars(f : "Formula", target : set) -> tuple["Formula", dict[str, str]]:
-    #     def rec(cur):
-    #         if isinstance(cur, str) and cur not in target: # either constant or not in target set
-    #             return cur, dict()
-    #         elif isinstance(cur, str) and cur in target:
-    #             z_x = "__z_" + cur 
-    #             tree = ("^", cur, z_x)
-    #             return tree, { z_x: cur }
-    #         else:
-    #             remainder = [ rec(c) for c in cur[1:] ]
-    #             right = tuple(tree for tree, _ in remainder )
-    #             new_vars = {} 
-    #             for _, new_vars_sub in remainder: new_vars |= new_vars_sub
-    #             return (cur[0], *right), new_vars
-    #     tree, new_vars = rec(f.top)
-    #     return Formula(tree), new_vars
-
-# def outof(k : int, X : set) -> Formula:
-#     if k <= 0: return Formula.parse("1") # all assignments for X satisfy this
-#     if k > len(X): return Formula.parse("0") # no assignment for X can satisfy this
-# 
-#     x = next(iter(X))
-#     Xmx = X - { x }
-#     xf = Formula.parse(x)
-#     if len(X) == 1 and k == 1: return xf
-#     elif k == len(X): return xf & outof(k-1, Xmx)
-#     elif k == 1: return xf | outof(1, Xmx) 
-#     else: return xf & outof(k-1, Xmx) | outof(k, Xmx)
-# 
-# def reach(f : Formula, k : int, Y: set) -> tuple[Formula, set]:
-#     # returns a (formula, set)-tuple (g,Y') where
-#     # (exists Y'. g)(u) = 1 iff there exists v in B(Y) s.t. |v| <= k and f(u ^ v) = 1.
-#     f_flip, new_vars = f.add_flip_vars(Y)
-#     new_vars = set(flip_var for flip_var, var in new_vars.items() if var in Y)
-#     return (~outof(k+1, new_vars) & f_flip).simplify(), new_vars
 
 Formula.one = Formula.parse("1")
 Formula.zero = Formula.parse("0")

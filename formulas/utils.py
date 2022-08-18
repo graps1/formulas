@@ -1,3 +1,4 @@
+from random import randint
 
 def cnf2dimacs(cnf, projected=set()):
     # example output for input = ([{1,2,-3},{-2,3}], projected_set={1,2})
@@ -16,3 +17,14 @@ def cnf2dimacs(cnf, projected=set()):
     if is_projected: ret += "c p show " + " ".join(map(str, projected)) + " 0\n"
     for cl in cnf: ret += " ".join(map(str, cl)) + " 0\n"
     return ret
+
+def random_k_cnf(n,m,k) -> tuple[list[list[int]], str]:
+    cnf, formula = [], ""
+    for ctr in range(m):
+        clause = [(randint(0,1)*2-1)*randint(1,n) for _ in range(k)]
+        inner = "(" + "&".join(f"x{idx}" if idx>0 else f"~x{-idx}" for idx in clause) + ")"
+        formula = formula + "|" + inner if ctr > 0 else inner 
+        cnf.append(clause)
+    return cnf, formula
+
+

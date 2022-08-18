@@ -1,4 +1,19 @@
-from formulas import Buddy, BuddyNode, Formula
+from formulas import Buddy, random_k_cnf, Formula
+
+def test_reordering():
+    _, formula = random_k_cnf(20, 5*4, 3)
+    formula = Formula.parse(formula)
+    vars = list(formula.vars)
+    optimized_size = None
+    with Buddy(vars) as model:
+        model.set_dynamic_reordering(True) # this doesn't work...
+        f = model.node(formula)
+        # model.reorder(2)
+        optimized_size = f.nodecount
+    with Buddy(vars) as model:
+        model.set_dynamic_reordering(False)
+        f = model.node(formula)
+        assert optimized_size < f.nodecount
 
 def test_bdd():
     with Buddy(["x", "y", "z"]) as model:
@@ -12,7 +27,7 @@ def test_bdd():
         assert h.satcount == 2 
 
         fx = f.flip("x")
-        assert fx == model.node("~x & (y | z)")
+        assert fx == model.node("~x & (y | z)") 
 
         f1 = f.restrict(x)
         f0 = f.restrict(~x)

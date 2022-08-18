@@ -1,7 +1,6 @@
 import os
 from ctypes import CDLL, c_double, c_int, c_char_p, byref, POINTER
-from functools import cached_property, cache
-from typing import Tuple, Union
+from typing import Iterable, Tuple, Union
 
 from .formula import Formula
 
@@ -16,86 +15,76 @@ class BuddyNode:
 			self.model._bdd.bdd_delref(self.node_id)
 
 	def __hash__(self): return self.node_id.__hash__()
+
 	def __eq__(self, other : "BuddyNode"): 
 		return isinstance(other, BuddyNode) and \
 			   self.model == other.model and \
 			   self.node_id == other.node_id
 
 	# boolean operations on BDDs
-	@cache
 	def __invert__(self) -> "BuddyNode": 
 		return self.model.apply("~", self)
 
-	@cache
 	def __and__(self, other : "BuddyNode") -> "BuddyNode": 
 		return self.model.apply("&", self, other)
 
-	@cache
 	def __sub__(self, other : "BuddyNode") -> "BuddyNode": 
 		return self & ~other
 
-	@cache
 	def __or__(self, other : "BuddyNode") -> "BuddyNode": 
 		return self.model.apply("|", self, other)
 
-	@cache
 	def __xor__(self, other : "BuddyNode") -> "BuddyNode": 
 		return self.model.apply("^", self, other)
 
-	@cache
 	def __lshift__(self, other : "BuddyNode") -> "BuddyNode": 
 		return self.model.apply("->", self, other)
 
-	@cache
 	def __rshift__(self, other : "BuddyNode") -> "BuddyNode": 
 		return other << self
 
-	@cache
 	def ite(self, if_true : "BuddyNode", if_false : "BuddyNode") -> "BuddyNode": 
 		return self.model.apply("ite", self, if_true, if_false)
 
-	@cache
 	def equiv(self, other : "BuddyNode") -> "BuddyNode": 
 		return self.model.apply("<->", self, other)
 
-	@cache
 	def flip(self, var : str) -> "BuddyNode":
 		xf = self.model.node(var)
 		f0, f1 = self.restrict(~xf), self.restrict(xf)
 		return xf.ite(f0, f1)	
 
-	@cached_property
+	@property
 	def var(self) -> str:
 		if self.node_id in [0,1]: return None
 		return self.model.vars[self.model._bdd.bdd_var(self.node_id)]
 
-	@cached_property
+	@property
 	def low(self) -> "BuddyNode": 
 		return BuddyNode(self.model, self.model._bdd.bdd_low(self.node_id))
 
-	@cached_property
+	@property
 	def high(self) -> "BuddyNode": 
 		return BuddyNode(self.model, self.model._bdd.bdd_high(self.node_id))
 
-	@cached_property
+	@property
 	def satcount(self) -> int: 
 		return self.model._bdd.bdd_satcount(self.node_id)
 
-	@cached_property
+	@property
 	def nodecount(self) -> int:
 		return self.model._bdd.bdd_nodecount(self.node_id)
 
-	@cached_property
+	@property
 	def var_profile(self) -> dict[str, int]:
 		# returns a variable-int-dictionary that counts how often variable nodes occur in this function
 		profile = self.model._bdd.bdd_varprofile(self.node_id)
 		return { var: count for var, count in zip(self.model.vars, profile.contents ) }
 
-	@cached_property 
+	@property 
 	def depends_on(self) -> set[str]:
 		return set(v for v,c in self.var_profile.items() if c > 0)
 
-	@cache
 	def restrict(self, u : "BuddyNode") -> "BuddyNode": 
 		return BuddyNode(self.model, self.model._bdd.bdd_restrict(self.node_id, u.node_id))
 
@@ -113,7 +102,7 @@ class BuddyNode:
 				f.write("\n".join(self.model.vars))
 
 class Buddy:
-	def __init__(self, vars: list, lib="/usr/local/lib/libbdd.so") -> None: 
+	def __init__(self, vars: list[str], lib:str ="/usr/local/lib/libbdd.so") -> None: 
 		buddy = CDLL(lib)
 
 		buddy.bdd_varprofile.restype = POINTER(c_int * len(vars))
@@ -122,12 +111,22 @@ class Buddy:
 		buddy.bdd_setmaxincrease(1<<27)
 		buddy.bdd_setcacheratio(32)
 		buddy.bdd_setvarnum(c_int(len(vars)))
+		buddy.bdd_swapvar.restype = c_int
+		buddy.bdd_autoreorder.restype = c_int
+		buddy.bdd_varblockall()
 		self._bdd = buddy
 
 		# generate dict for varnames
 		self.__vars = tuple(vars)
 		self.__name2var_id = { x : k for k, x in enumerate(self.vars) }
 		self.__called_done = False
+
+	def swap_vars(self, v1, v2):
+		assert v1 in self.__name2var_id
+		assert v2 in self.__name2var_id
+		id1, id2 = self.__name2var_id[v1], self.__name2var_id[v2]
+		self._bdd.bdd_swapvar(id1, id2)	
+		self._bdd.bdd_printorder()
 
 	@property 
 	def vars(self) -> tuple[str]:
@@ -156,9 +155,15 @@ class Buddy:
 			if formula.c1 not in self.__name2var_id.keys():
 				raise Exception(f"Variable {formula.c1} not found!")
 			return BuddyNode(self, self._bdd.bdd_ithvar(self.__name2var_id[formula.c1]))
+		elif formula.op == "~":
+			return self.apply("~", self.node(formula.c1))
 		else:
 			nodes = [ self.node(c) for c in formula.children ]
-			return self.apply(formula.op, *nodes)
+			result = nodes[0] 
+			for right in nodes[1:]:
+				result = self.apply(formula.op, result, right)
+			return result
+
 
 	def __enter__(self): 
 		return self
@@ -204,13 +209,22 @@ class Buddy:
 		else:
 			self._bdd.bdd_disable_reorder()
 
-	def add_reorder_vars(self):
-		self._bdd.bdd_varblockall()
-
 	def reorder(self, method=3):
-		rnames = {1:"WIN2", 2:"WIN2ITE", 3:"SIFT", 4:"SIFTITE", 5:"WIN3", 6:"WIN3ITE"}
+		rnames = {
+			1:"WIN2", 
+			2:"WIN2ITE", 
+			3:"SIFT", 
+			4:"SIFTITE", 
+			5:"WIN3", 
+			6:"WIN3ITE", 
+			7:"RANDOM"}
 		print("reorder via",rnames[method])
+		# for var in self.vars:
+		# 	print(var, self._bdd.bdd_var2level(self.__name2var_id[var]))
+		# print("="*10)
 		self._bdd.bdd_reorder(method)
+		# for var in self.vars:
+		# 	print(var, self._bdd.bdd_var2level(self.__name2var_id[var]))
 
 	@classmethod
 	def load(file_bdd, vars) -> Tuple["Buddy", BuddyNode]:

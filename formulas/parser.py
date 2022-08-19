@@ -57,6 +57,3 @@ def parse(formula: str):
     tree = PARSER.parse(formula)
     result = FormulaTransformer().transform(tree)
     return result[0]
-
-if __name__ == "__main__":
-    print( parse("x ^ y <-> z") )

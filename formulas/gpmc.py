@@ -48,17 +48,4 @@ class GPMC:
         os.remove(self.__tmp_filename)
         return value
 
-
-if __name__ == "__main__":
-    f = Formula.parse("~x1 & (x2 | x3)") & Formula.parse("~x4")
-    gpmc = GPMC()
-    ex_quantified={"x2", "x3"}
-    result_tseitin = gpmc.satcount(f, debug=False, exists=ex_quantified)
-    result_hand_coded = gpmc.satcount([[-1], [2,3], [-4]], debug=False, exists={2,3})
-    print(f"analyzing f={f}")
-    print(f"existentially quantified={ex_quantified}")
-    print(f"satcount via tseitin transformation: {result_tseitin}")
-    print(f"satcount of hand-coded cnf: {result_hand_coded}")
-    print(f"variables in f: {f.vars}")
-    print(f"cofactor wrt x2 = 1: {f.cofactor('x2', True)}")
  

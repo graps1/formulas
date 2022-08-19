@@ -238,10 +238,3 @@ class Formula:
 
 Formula.one = Formula.parse("1")
 Formula.zero = Formula.parse("0")
-
-if __name__ == "__main__":
-    f = Formula.parse("((x <-> y) | z) & (x <-> y)") & Formula.parse("y")
-    print(f)
-    print(f.cofactor("y", False).simplify())
-    print(f.flip("x").cofactor("y", False).simplify())
-    print(f.tseitin())

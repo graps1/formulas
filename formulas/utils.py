@@ -22,8 +22,8 @@ def random_k_cnf(n,m,k) -> tuple[list[list[int]], str]:
     cnf, formula = [], ""
     for ctr in range(m):
         clause = [(randint(0,1)*2-1)*randint(1,n) for _ in range(k)]
-        inner = "(" + "&".join(f"x{idx}" if idx>0 else f"~x{-idx}" for idx in clause) + ")"
-        formula = formula + "|" + inner if ctr > 0 else inner 
+        inner = "(" + "|".join(f"x{idx}" if idx>0 else f"~x{-idx}" for idx in clause) + ")"
+        formula = formula + "&" + inner if ctr > 0 else inner 
         cnf.append(clause)
     return cnf, formula
 

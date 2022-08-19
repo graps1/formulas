@@ -16,6 +16,7 @@ Instantiating formulas, cofactors, flipping and renaming variables:
 
 ```python
 >>> f = Formula.parse("x & (y | z) & 1") # output: x&(y|z)&1
+>>> len(f) # output: 7 (counts constants, variables, operators)
 >>> g = f.cofactor("x", True) # output: 1&(y|z)&1
 >>> h = f.flip("x") # output: ~x&(y|z)&1
 >>> k = f.rename({"x": "v"}) # output: v&(y|z)&1

@@ -29,6 +29,13 @@ class Formula:
                 self.op == other.op and \
                 all(c1 == c2 for c1,c2 in zip(self.children, other.children))
 
+    def __len__(self) -> int:
+        if self.op in ["V", "C"]: return 1
+        elif len(self.children) == 1:
+            return 1 + len(self.c1)
+        else:
+            return (len(self.children) - 1) + sum(map(len, self.children))
+
     @property
     def is_constant(self) -> bool: return self.op == "C"
 

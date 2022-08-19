@@ -8,10 +8,15 @@ Requirements
 
 ## Working with formulas
 
-Instantiating formulas, cofactors, flipping and renaming variables:
+Importing the `Formula` class:
 
 ```python
 >>> from formulas import Formula
+```
+
+Instantiating formulas, cofactors, flipping and renaming variables:
+
+```python
 >>> f = Formula.parse("x & (y | z) & 1") # output: x&(y|z)&1
 >>> g = f.cofactor("x", True) # output: 1&(y|z)&1
 >>> h = f.flip("x") # output: ~x&(y|z)&1
@@ -25,6 +30,25 @@ Allowed operations are, in the following precedence order,
     ~ & | -> <- ^ <->
 ```
 
+Multiple levels of associative operators such as `|`, `&` and `^` are automatically expanded, i.e. `(x & y) & z` is the same as `x & (y & z)` and `x & y & z`. Equality is checked on a structural level:
+
+```python
+>>> f = Formula.parse("(x & y) & z")
+>>> g = Formula.parse("x & (y & z)")
+>>> h = Formula.parse("x & y & z")
+>>> f == g == h
+True
+``` 
+
+Ambiguous formulas like `x <-> y <-> z` are interpreted in a left-first manner,
+
+```python
+>>> f = Formula.parse("x <-> y <-> z")
+>>> f
+x<->(y<->z)
+```
+
+
 Formulas can be created either by parsing strings or by applying binary operations directly on other formulas. However, mind that Python's operators might take a [different precedence order](https://www.programiz.com/python-programming/precedence-associativity):
 
 ```python
@@ -32,11 +56,11 @@ Formulas can be created either by parsing strings or by applying binary operatio
 >>> x,y,z = Formula.parse("x"), Formula.parse("y"), Formula.parse("z")
 >>> f = (x & y | z) >> x
 >>> g = Formula.parse("(x & y | z) -> x")
->>> f == g
+>>> f == g 
 True
 ```
 
-One can apply a [Tseitin transformation](https://en.wikipedia.org/wiki/Tseytin_transformation) to obtain the CNF of an equisatisfiable formula. The function returns a tuple `(cnf, sub2id)`, where `cnf` is a list (=the set of clauses) of lists (=clause) of integers (=literals that denote variables. If negative, then they denote the negated variable). `sub2id` is a mapping from sub-formulas to their corresponding variable in the Tseitin-transformed formula.
+One can apply a [Tseitin transformation](https://en.wikipedia.org/wiki/Tseytin_transformation) to obtain the CNF of an equisatisfiable formula. The function returns a tuple `(cnf, sub2id)`, where `cnf` is a list (=set of clauses) of lists (=clauses) of integers (=literals that denote variables. If negative, then they denote the negated variable). `sub2id` is a mapping from sub-formulas to their corresponding variable in the Tseitin-transformed formula.
 
 ```python
 >>> from formulas import Formula

@@ -29,14 +29,13 @@ Allowed operations are, in the following precedence order,
     ~ & | -> <- ^ <->
 ```
 
-Multiple levels of associative operators such as `|`, `&` and `^` are automatically expanded, i.e. `(x & y) & z` is the same as `x & (y & z)` and `x & y & z`. Equality is checked on a structural level:
+Multiple levels of associative operators such as `|`, `&` and `^` are NOT expanded, i.e. `(x & y) & z` is not the same as `x & (y & z)`. This might be changed later on...
 
 ```python
 >>> f = Formula.parse("(x & y) & z")
 >>> g = Formula.parse("x & (y & z)")
->>> h = Formula.parse("x & y & z")
->>> f == g == h
-True
+>>> f == g
+False
 ``` 
 
 Ambiguous formulas like `x <-> y <-> z` are interpreted in a left-first manner, but should be avoided:
@@ -46,7 +45,6 @@ Ambiguous formulas like `x <-> y <-> z` are interpreted in a left-first manner, 
 >>> f
 x<->(y<->z)
 ```
-
 
 Formulas can be created either by parsing strings or by applying binary operations directly on other formulas. However, mind that Python's operators might take a [different precedence order](https://www.programiz.com/python-programming/precedence-associativity):
 

@@ -1,10 +1,59 @@
+from dataclasses import replace
 from .parser import OPERATIONS, PRECEDENCE, ASSOCIATIVE, parse
 from functools import cached_property
 from typing import Union
 import copy
 
-SIMPLIFICATION_RULES = [
-    ("1 & x", "x")
+SIMP_RULES = [
+    ("~~A", "A"),
+
+    ("~A & A", "0"),
+    ("A & ~A", "0"),
+    ("A & A", "A"),
+    ("1 & A", "A"),
+    ("A & 1", "A"),
+    ("0 & A", "0"),
+    ("A & 0", "0"),
+
+    ("A | ~A", "1"),
+    ("~A | A", "1"),
+    ("A | A", "A"),
+    ("0 | A", "A"),
+    ("A | 0", "A"),
+    ("1 | A", "1"),
+    ("A | 1", "1"),
+
+    ("A ^ A", "0"),
+    ("A ^ ~A", "1"),
+    ("~A ^ A", "1"),
+    ("0 ^ A", "A"),
+    ("A ^ 0", "A"),
+    ("1 ^ A", "~A"),
+    ("A ^ 1", "~A"),
+
+    ("A -> ~A", "~A"),
+    ("~A -> A", "A"),
+    ("A -> A", "1"),
+    ("0 -> A", "1"),
+    ("A -> 0", "~A"),
+    ("1 -> A", "A"),
+    ("A -> 1", "1"),
+
+    ("A <- ~A", "A"),
+    ("~A <- A", "~A"),
+    ("A <- A", "1"),
+    ("0 <- A", "~A"),
+    ("A <- 0", "1"),
+    ("1 <- A", "1"),
+    ("A <- 1", "A"),
+
+    ("A <-> A", "1"),
+    ("A <-> ~A", "0"),
+    ("~A <-> A", "0"),
+    ("0 <-> A", "~A"),
+    ("A <-> 0", "~A"),
+    ("1 <-> A", "A"),
+    ("A <-> 1", "A"),
 ]
 
 class Formula:
@@ -36,6 +85,12 @@ class Formula:
         else:
             return (len(self.children) - 1) + sum(map(len, self.children))
 
+    def treestr(self, indent=0) -> str:
+        ind = "  "*indent
+        if self.op in ["C", "V"]: return ind + self.c1
+        else: return ind + self.op + "\n" +\
+                     "\n".join(c.treestr(indent+1) for c in self.children)
+
     @property
     def is_constant(self) -> bool: return self.op == "C"
 
@@ -56,19 +111,7 @@ class Formula:
         def rec(tree):
             op, children = tree[0], tree[1:]
             if op in ["C", "V"]: return Formula(op, *children)
-            if op in ASSOCIATIVE:
-                while True:
-                    break_idx = None
-                    for idx, c in enumerate(children):
-                        if c[0] == op: 
-                            break_idx = idx
-                            break
-                    if break_idx is None:
-                        break
-                    children = children[:break_idx] \
-                             + children[break_idx][1:] \
-                             + children[break_idx+1:]
-            return Formula(op, *map(rec, children) )
+            else: return Formula(op, *map(rec, children) )
         return rec(parse(formula))
 
     def __repr__(self):
@@ -91,72 +134,37 @@ class Formula:
             self.__str_repr = f"{self.op}".join(child_strings)
         return str(self)
 
+    def is_applicable(self, template: "Formula") -> dict[str, "Formula"]:
+        def rec(formula: "Formula", temp: "Formula", replacement: dict):
+            if temp.op == "V": 
+                if temp.c1 not in replacement:
+                    replacement[temp.c1] = formula 
+                return replacement[temp.c1] == formula
+            elif temp.op == "C":
+                return temp.c1 == formula.c1
+            else:
+                return temp.op == formula.op and \
+                       len(formula.children) == len(temp.children) and \
+                       all( rec(f, t, replacement) for f,t in zip(formula.children, temp.children) )
+        replacement = {}
+        result = rec(self, template, replacement)
+        if result: return replacement 
+        else: return None
+
     def simplify(self) -> "Formula":
-        def try_remove_double_negation(form: Formula) -> Formula:
-            if form.op == "~" and form.c1.op == "~": return form.c1.c1
-            else: return form
-
-        # removes occurrences of 0s and 1s
-        if self.is_variable or self.is_constant:
-            return copy.copy(self)
-        if self.op == "~":
-            sub = self.c1.simplify()
-            if sub == Formula.zero: return Formula.one
-            elif sub == Formula.one: return Formula.zero
-            elif sub.op == "~": return sub.c1 # double negation
-            else: return Formula("~", sub)
-        
-        simp_children = list(c.simplify() for c in self.children)
-        if self.op == "&":
-            if any(c == Formula.zero for c in simp_children): return Formula.zero
-            if all(c == Formula.one for c in simp_children): return Formula.one
-            filtered = [c for c in simp_children if c != Formula.one]
-            filtered = list(dict.fromkeys(filtered)) # removes duplicates
-            if len(filtered) == 1: return filtered[0]
-            else: return Formula("&", *filtered)
-        elif self.op == "|":
-            if any(c == Formula.one for c in simp_children): return Formula.one
-            if all(c == Formula.zero for c in simp_children): return Formula.zero
-            filtered = [ c for c in simp_children if c != Formula.zero ]
-            filtered = list(dict.fromkeys(filtered)) # removes duplicates
-            if len(filtered) == 1: return filtered[0] # exactly one is not 0
-            else: return Formula("|", *filtered) # more than one are not 0
-        elif self.op == "^":
-            filtered = [c for c in simp_children if c != Formula.zero and c != Formula.one]
-            ones = len([c for c in simp_children if c == Formula.one])
-            if ones % 2 == 0: # even number of ones
-                if len(filtered) == 0: return Formula.zero
-                elif len(filtered) == 1: return filtered[0]
-                else: return Formula("^", *filtered)
-            else: # odd number of ones
-                if len(filtered) == 0: return Formula.one
-                elif len(filtered) == 1: return try_remove_double_negation(Formula("~", filtered[0]))
-                else: return Formula("~", Formula("^", *filtered))
-        
-        left, right = simp_children # there must be two at this point
-        if self.op == "<->":
-            if left == right: return Formula.one
-            elif left.is_constant and right.is_constant: return Formula.zero # at this point, they cannot both be constant
-            elif left == Formula.one: return right # right cannot be constant
-            elif left == Formula.zero: return try_remove_double_negation(Formula("~", right)) # -- 
-            elif right == Formula.one: return left  # left cannot be constant
-            elif right == Formula.zero: return try_remove_double_negation(Formula("~", left)) # --
-            else: return copy.copy(self)
-        elif self.op == "->":
-            if left == right: return Formula.one
-            elif left == Formula.one: return right
-            elif left == Formula.zero: return Formula.one 
-            elif right == Formula.zero: return try_remove_double_negation(Formula("~", left))
-            elif right == Formula.one: return Formula.one 
-            else: return copy.copy(self)
-        elif self.op == "<-":
-            if left == right: return Formula.one
-            elif right == Formula.one: return left
-            elif right == Formula.zero: return Formula.one 
-            elif left == Formula.zero: return try_remove_double_negation(Formula("~", right))
-            elif left == Formula.one: return Formula.one 
-            else: return copy.copy(self)
-
+        if self.op in ["C", "V"]: 
+            return self
+        else:
+            self_simplified = Formula(self.op, *(c.simplify() for c in self.children))
+            while True:
+                rule_applicable = False
+                for rule, result in SIMP_RULES:
+                    if (replacement := self_simplified.is_applicable(rule)):
+                        self_simplified = result.replace(replacement)                    
+                        rule_applicable = True 
+                        break
+                if not rule_applicable: break
+            return self_simplified 
 
     def cofactor(self, var : str, val : bool) -> "Formula":
         if self.op == "V" and self.c1 == var: return Formula.one if val else Formula.zero
@@ -186,10 +194,14 @@ class Formula:
         elif self.op in ["V", "C"]: return copy.copy(self)
         else: return Formula(self.op, *(c.flip(var) for c in self.children))
     
-    def rename(self, d: dict):
-        if self.op == "V" and self.c1 in d: return Formula("V", d[self.c1])
+    def replace(self, d: dict[str, Union["Formula", str]]):
+        if self.op == "V" and self.c1 in d: 
+            repl = d[self.c1]
+            if isinstance(repl, str): 
+                repl = Formula.parse(repl)
+            return repl
         elif self.op in ["V", "C"]: return copy.copy(self)
-        else: return Formula(self.op, *(c.rename(d) for c in self.children))
+        else: return Formula(self.op, *(c.replace(d) for c in self.children))
 
     def __copy__(self) -> "Formula":
         return Formula(self.op, *(copy.copy(c) for c in self.children))
@@ -243,5 +255,7 @@ class Formula:
                     raise Exception(f"operation {sub.op} unknown!")
         return cnf, sub2idx
 
+
+SIMP_RULES = [ (Formula.parse(left), Formula.parse(right)) for left,right in SIMP_RULES ]
 Formula.one = Formula.parse("1")
 Formula.zero = Formula.parse("0")

@@ -7,9 +7,8 @@ def test_parsing():
     f3 = Formula.parse("x <-> (y___ | z) | x & (a_2 ^ z)") 
     assert f3.vars == { "x", "y___", "z", "x", "a_2", "z" }
     f4 = Formula.parse("(x & y) & z")
-    f5 = Formula.parse("x & (y & z)") 
-    f6 = Formula.parse("x & y & z")
-    assert f4 == f5 == f6
+    f5 = Formula.parse("x & (y & z)")
+    assert f4 != f5
     
     x,y,z = Formula.parse("x"), Formula.parse("y"), Formula.parse("z")
     f = (x & y | z) >> x
@@ -35,10 +34,11 @@ def test_simplification():
         ("~x -> 0", "x"), 
         ("x <- 1", "x"),
         ("~~~~x", "x"),
-        ("~~~x", "~x")
+        ("~~~x", "~x"),
+        ("(1 & (x | z)) | y", "x | z | y")
     ]
     for form, res in formula_result_pairs: 
-        assert Formula.parse(form).simplify() == Formula.parse(res)
+        assert Formula.parse(form).simplify() == Formula.parse(res).simplify()
 
 def test_cofactor():
     formula_result_pairs = [
@@ -61,7 +61,7 @@ def test_tseitin():
     # then the sub-formulas are parsed in a left-to-right manner
     # so the sub-formulas of f are: 
     # x, y, z, y&z, x&y&z
-    f = Formula.parse("(x & y) & z") 
+    f = Formula.parse("x & (y & z)").simplify()
     g = Formula.parse("y & z")
     cnf, sub2idx = f.tseitin()
     Cf, Ax, Cg, Ay, Bz = sub2idx[f], sub2idx[x], sub2idx[g], sub2idx[y], sub2idx[z]
@@ -70,5 +70,5 @@ def test_tseitin():
 
 def test_renaming():
     f = Formula.parse("x & y")
-    g = f.rename({"x": "y", "y": "x"})
+    g = f.replace({"x": "y", "y": "x"})
     assert g == Formula.parse("y & x")

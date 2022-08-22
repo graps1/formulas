@@ -201,7 +201,7 @@ class Formula:
             repl = d[self.c1]
             if isinstance(repl, str): 
                 repl = Formula.parse(repl)
-            return repl
+            return copy.copy(repl)
         elif self.op in ["V", "C"]: return copy.copy(self)
         else: return Formula(self.op, *(c.replace(d) for c in self.children))
 

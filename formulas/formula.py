@@ -5,6 +5,8 @@ from typing import Union
 import copy
 
 SIMP_RULES = [
+    ("~0", "1"),
+    ("~1", "0"),
     ("~~A", "A"),
 
     ("~A & A", "0"),
@@ -159,7 +161,7 @@ class Formula:
             while True:
                 rule_applicable = False
                 for rule, result in SIMP_RULES:
-                    if (replacement := self_simplified.is_applicable(rule)):
+                    if (replacement := self_simplified.is_applicable(rule)) is not None:
                         self_simplified = result.replace(replacement)                    
                         rule_applicable = True 
                         break

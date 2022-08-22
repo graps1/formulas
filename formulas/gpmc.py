@@ -31,6 +31,8 @@ class GPMC:
     def satcount(self, cnf: Union[Formula, list[list[int]]], \
                  debug=False, exists=set()):
         if isinstance(cnf, Formula):
+            cnf = cnf.simplify()
+            print(cnf)
             if cnf == Formula.zero: return 0
             if cnf == Formula.one: return 1
             orig_vars = cnf.vars

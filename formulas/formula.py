@@ -211,7 +211,7 @@ class Formula:
     def __hash__(self) -> int:
         return self.__repr__().__hash__()
 
-    def tseitin(self) -> tuple[list[set], dict[str, int]]:
+    def tseitin(self) -> tuple[list[set], dict["Formula", int]]:
         formula = self.simplify()
         if formula == Formula.zero or formula == Formula.one: 
             return [], {}

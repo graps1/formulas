@@ -2,4 +2,5 @@ dist
 build
 .pytest_cache
 *.egg-info
+.vscode
 __pycache__

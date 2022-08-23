@@ -1,17 +1,18 @@
-from formulas import GPMC, Formula
+from formulas import GPMC, Formula, FormulaContext
 
 def test_satcount():
-    f = Formula.parse("x & (y | z)")
+    ctx = FormulaContext()
+    f = ctx.parse("x & (y | z)")
     solver = GPMC()
     sc = solver.satcount
     assert sc(f) == 3
     assert sc(f, exists={"x"}) == 3
     assert sc(f, exists={"y"}) == 2 # x/1 and for z/0 choose y/1, for z/1 d.c.
 
-    f = Formula.parse("~x | (y & ~z)")
+    f = ctx.parse("~x | (y & ~z)")
     assert sc(f) == 5 
 
-    f = Formula.parse("(x & y) ^ (z <-> e)")
+    f = ctx.parse("(x & y) ^ (z <-> e)")
     assert sc(f) + sc(~f) == 2**4
 
     f1, f0 = f.cofactor("x", True).simplify(), f.cofactor("x", False).simplify()

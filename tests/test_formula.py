@@ -1,18 +1,19 @@
-from formulas import Formula
+from formulas import  FormulaContext
 
 def test_parsing():
-    f1 = Formula.parse("x & (y | z)")
-    f2 = Formula.parse("x & y | z")
+    ctx = FormulaContext()
+    f1 = ctx.parse("x & (y | z)")
+    f2 = ctx.parse("x & y | z")
     assert f1 != f2
-    f3 = Formula.parse("x <-> (y___ | z) | x & (a_2 ^ z)") 
+    f3 = ctx.parse("x <-> (y___ | z) | x & (a_2 ^ z)") 
     assert f3.vars == { "x", "y___", "z", "x", "a_2", "z" }
-    f4 = Formula.parse("(x & y) & z")
-    f5 = Formula.parse("x & (y & z)")
+    f4 = ctx.parse("(x & y) & z")
+    f5 = ctx.parse("x & (y & z)")
     assert f4 != f5
-    
-    x,y,z = Formula.parse("x"), Formula.parse("y"), Formula.parse("z")
+
+    x,y,z = ctx.parse("x"), ctx.parse("y"), ctx.parse("z")
     f = (x & y | z) >> x
-    g = Formula.parse("(x & y | z) -> x")
+    g = ctx.parse("(x & y | z) -> x")
     assert f == g
 
 def test_simplification():
@@ -37,23 +38,26 @@ def test_simplification():
         ("x <- 1", "x"),
         ("~~~~x", "x"),
         ("~~~x", "~x"),
-        ("(1 & (x | z)) | y", "x | z | y")
+        ("(1 & (x | z)) | y", "(x | z) | y")
     ]
+    ctx = FormulaContext()
     for form, res in formula_result_pairs: 
-        assert Formula.parse(form).simplify() == Formula.parse(res).simplify()
+        assert ctx.parse(form).simplify() == ctx.parse(res).simplify()
 
 def test_cofactor():
     formula_result_pairs = [
         ("x & 1 & 1", "1 & 1 & 1"),
         ("x & (x <-> y)", "1 & (1 <-> y)")
     ]
+    ctx = FormulaContext()
     for form, res in formula_result_pairs: 
-        assert Formula.parse(form).cofactor("x", True) == Formula.parse(res)
+        assert ctx.parse(form).cofactor("x", True) == ctx.parse(res)
 
 def test_tseitin():
-    x, y, z  = Formula.parse("x"), Formula.parse("y"), Formula.parse("z")
+    ctx = FormulaContext()
+    x, y, z  = ctx.var("x"), ctx.var("y"), ctx.var("z")
 
-    f = Formula.parse("x & y")
+    f = ctx.parse("x & y")
     cnf, sub2idx = f.tseitin()
     C, A, B = sub2idx[f], sub2idx[x], sub2idx[y]
     expected = [{C}, {-A, -B, C}, {A, -C}, {B, -C}]
@@ -63,14 +67,15 @@ def test_tseitin():
     # then the sub-formulas are parsed in a left-to-right manner
     # so the sub-formulas of f are: 
     # x, y, z, y&z, x&y&z
-    f = Formula.parse("x & (y & z)").simplify()
-    g = Formula.parse("y & z")
+    f = ctx.parse("x & (y & z)").simplify()
+    g = ctx.parse("y & z")
     cnf, sub2idx = f.tseitin()
     Cf, Ax, Cg, Ay, Bz = sub2idx[f], sub2idx[x], sub2idx[g], sub2idx[y], sub2idx[z]
     expected = [{Cf}, {-Ax, -Cg, Cf}, {Ax, -Cf}, {Cg, -Cf}, {-Ay, -Bz, Cg}, {Ay, -Cg}, {Bz, -Cg}]
     assert set(map(frozenset, cnf)) == set(map(frozenset, expected))
 
 def test_renaming():
-    f = Formula.parse("x & y")
+    ctx = FormulaContext()
+    f = ctx.parse("x & y")
     g = f.replace({"x": "y", "y": "x"})
-    assert g == Formula.parse("y & x")
+    assert g == ctx.parse("y & x")

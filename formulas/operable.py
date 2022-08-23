@@ -1,17 +1,10 @@
 from abc import ABC, abstractmethod
 from . import parser
 
-class classproperty(object):
-    # src: https://stackoverflow.com/questions/5189699/how-to-make-a-class-property
-    def __init__(self, f):
-        self.f = f
-    def __get__(self, obj, owner):
-        return self.f(owner)
-
 class Operable(ABC):
 
-    def __init__(self, manager: "OperableContext") -> None:
-        self._manager = manager
+    def __init__(self, context: "OperableContext") -> None:
+        self.ctx = context 
 
     @abstractmethod
     def __hash__(self): 
@@ -35,17 +28,16 @@ class Operable(ABC):
 
     @property
     @abstractmethod 
-    def vars(self) -> list[str]: 
+    def vars(self) -> set[str]: 
         raise NotImplementedError()
 
-    def __or__(self, other: "Operable") -> "Operable": return self._manager.apply("|", self, other)
-    def __and__(self, other: "Operable") -> "Operable": return self._manager.apply("&", self, other)
-    def __xor__(self, other: "Operable") -> "Operable": return self._manager.apply("^", self, other)
-    def __rshift__(self, other: "Operable") -> "Operable": return self._manager.apply("->", self, other)
-    def __lshift__(self, other: "Operable") -> "Operable": return self._manager.apply("<-", self, other)
-    def __invert__(self): return self._manager.apply("~", self)
-    def biimp(self, other: "Operable") -> "Operable": return self._manager.apply("<->", self, other)
-    def ite(self, o1: "Operable", o2: "Operable") -> "Operable": return (self & o1) | (~self & o2)
+    def __or__(self, other: "Operable") -> "Operable": return self.ctx.apply("|", self, other)
+    def __and__(self, other: "Operable") -> "Operable": return self.ctx.apply("&", self, other)
+    def __xor__(self, other: "Operable") -> "Operable": return self.ctx.apply("^", self, other)
+    def __rshift__(self, other: "Operable") -> "Operable": return self.ctx.apply("->", self, other)
+    def __lshift__(self, other: "Operable") -> "Operable": return self.ctx.apply("<-", self, other)
+    def __invert__(self): return self.ctx.apply("~", self)
+    def biimp(self, other: "Operable") -> "Operable": return self.ctx.apply("<->", self, other)
 
 class OperableContext(ABC):
     @property
@@ -69,8 +61,8 @@ class OperableContext(ABC):
     def parse(self, formula: str) -> "Operable":
         def rec(parsed):
             op, args = parsed[0], parsed[1:]
-            if op == "C" and args[0] == "0": return self.false()
-            elif op == "C" and args[0] == "1": return self.true()
+            if op == "C" and args[0] == "0": return self.false
+            elif op == "C" and args[0] == "1": return self.true
             elif op == "V": return self.var(args[0])
-            else: return self.apply(op, *args)
+            else: return self.apply(op, *(rec(a) for a in args))
         return rec(parser.parse(formula))

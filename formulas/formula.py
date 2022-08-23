@@ -1,10 +1,9 @@
-from dataclasses import replace
-from .parser import OPERATIONS, PRECEDENCE, ASSOCIATIVE, parse
-from functools import cached_property
+from .operable import Operable, OperableContext
+from .parser import OPERATIONS, PRECEDENCE
 from typing import Union
 import copy
 
-SIMP_RULES = [
+_SIMP_RULES = [
     ("~0", "1"),
     ("~1", "0"),
     ("~~A", "A"),
@@ -58,34 +57,81 @@ SIMP_RULES = [
     ("A <-> 1", "A"),
 ]
 
-class Formula:
-    def __init__(self, op=None, *children):
+class Formula(Operable):
+    def __init__(self, ctx: "FormulaContext", op=None, *children):
+        super().__init__(ctx)
 
-        assert op in ["C","V"] or op in OPERATIONS
+        assert op in ["C","V"] or op in OPERATIONS, op
 
-        if op in ["C", "V"]: assert len(children)==1 and isinstance(children[0], str)
-        else: assert all(isinstance(c,Formula) for c in children)
+        if op in ["C", "V"]: assert len(children)==1 and isinstance(children[0], str), (op, children)
+        else: assert all(isinstance(c,Formula) for c in children), (op, children)
 
-        if op == "~": assert len(children)==1
-        elif op in ["->", "<-", "<->"]: assert len(children) == 2
-        elif op in ["|", "&", "^"]: assert len(children) >= 2
+        if op == "~": assert len(children)==1, (op, children)
+        elif op in ["->", "<-", "<->"]: assert len(children) == 2, (op, children)
+        elif op in ["|", "&", "^"]: assert len(children) >= 2, (op, children)
 
         self.__op = op 
         self.__children = tuple(children)
         self.__c1 = children[0]
         self.__str_repr = None
 
+    # --- ABSTRACT METHODS ---
+
+    def __hash__(self) -> int:
+        return self.__repr__().__hash__()
+
+    def __call__(self, assignment: dict[str, bool]) -> bool:
+        if self.op == "V": return assignment[self.c1]
+        elif self.op == "C": return {"0": False, "1": True}[self.c1]
+        elif self.op == "~": return not self.c1(assignment)
+        else: # 2-ary operation
+            left, right = self.children
+            if self.op == "&":
+                return left(assignment) and right(assignment)
+            elif self.op == "|":
+                return left(assignment) or right(assignment)
+            elif self.op == "<->":
+                return left(assignment) == right(assignment)
+            elif self.op == "->":
+                return not left(assignment) or right(assignment)
+            elif self.op == "<-":
+                return left(assignment) or not right(assignment)
+            elif self.op == "^":
+                return left(assignment) != right(assignment)
+
+    def __copy__(self) -> "Formula":
+        return Formula(self.ctx, self.op, *(copy.copy(c) for c in self.children))
+
+    def cofactor(self, var : str, val : bool) -> "Formula":
+        if self.op == "V" and self.c1 == var: return self.ctx.true if val else self.ctx.false
+        elif self.op in ["V", "C"]: return copy.copy(self)
+        else: return Formula(self.ctx, self.op, *(c.cofactor(var, val) for c in self.children))
+
+    def flip(self, var : str) -> "Formula":
+        if self.op == "V" and self.c1 == var: return Formula(self.ctx, "~", self)
+        elif self.op in ["V", "C"]: return copy.copy(self)
+        else: return Formula(self.ctx, self.op, *(c.flip(var) for c in self.children))
+
+    @property     
+    def vars(self) -> set[str]:
+        if self.op == "V": return { self.c1 }
+        elif self.op == "C": return set()
+        else: 
+            ret = set()
+            for c in self.children: ret |= c.vars
+            return ret
+
+    # --- END ABSTRACT METHODS ---
+
     def __eq__(self, other) -> bool: 
         return  isinstance(other, Formula) and \
+                self.ctx == other.ctx and \
                 self.op == other.op and \
                 all(c1 == c2 for c1,c2 in zip(self.children, other.children))
 
     def __len__(self) -> int:
         if self.op in ["V", "C"]: return 1
-        elif len(self.children) == 1:
-            return 1 + len(self.c1)
-        else:
-            return (len(self.children) - 1) + sum(map(len, self.children))
+        else: return 1 + sum(map(len, self.children))
 
     def treestr(self, indent=0) -> str:
         ind = "  "*indent
@@ -94,37 +140,25 @@ class Formula:
                      "\n".join(c.treestr(indent+1) for c in self.children)
 
     @property
-    def is_constant(self) -> bool: return self.op == "C"
+    def op(self) -> str: 
+        return self.__op
 
     @property
-    def is_variable(self) -> bool: return self.op == "V"
-
-    @property
-    def op(self) -> str: return self.__op
-
-    @property
-    def c1(self) -> Union["Formula", str]: return self.__c1
+    def c1(self) -> Union["Formula", str]: 
+        return self.__c1
 
     @property 
-    def children(self) -> list[Union["Formula", str]]: return self.__children
-
-    @classmethod
-    def parse(self, formula: str) -> "Formula":
-        def rec(tree):
-            op, children = tree[0], tree[1:]
-            if op in ["C", "V"]: return Formula(op, *children)
-            else: return Formula(op, *map(rec, children) )
-        return rec(parse(formula))
+    def children(self) -> list[Union["Formula", str]]: 
+        return self.__children
 
     def __repr__(self):
         if self.__str_repr is not None:
             return self.__str_repr
 
-        if self.is_variable or self.is_constant: 
+        if self.op in ["C", "V"]: 
             self.__str_repr = self.c1
         elif self.op == "~": 
-            if self.c1.is_variable or self.c1.is_constant: 
-                self.__str_repr = "~" + str(self.c1)
+            if self.c1.op in ["C", "V"]: self.__str_repr = "~" + str(self.c1)
             else: self.__str_repr = "~(" + str(self.c1) + ")"
         else:
             child_strings = []
@@ -157,63 +191,28 @@ class Formula:
         if self.op in ["C", "V"]: 
             return self
         else:
-            self_simplified = Formula(self.op, *(c.simplify() for c in self.children))
+            self_simplified = Formula(self.ctx, self.op, *(c.simplify() for c in self.children))
             while True:
                 rule_applicable = False
-                for rule, result in SIMP_RULES:
+                for rule, result in self.ctx.SIMP_RULES:
                     if (replacement := self_simplified.is_applicable(rule)) is not None:
                         self_simplified = result.replace(replacement)                    
                         rule_applicable = True 
                         break
                 if not rule_applicable: break
             return self_simplified 
-
-    def cofactor(self, var : str, val : bool) -> "Formula":
-        if self.op == "V" and self.c1 == var: return Formula.one if val else Formula.zero
-        elif self.op in ["V", "C"]: return copy.copy(self)
-        else: return Formula(self.op, *(c.cofactor(var, val) for c in self.children))
-         
-    def __and__(self, other : "Formula") -> "Formula": return Formula("&", self, other)
-    def __or__(self, other : "Formula") -> "Formula": return Formula("|", self, other)
-    def __xor__(self, other : "Formula") -> "Formula": return Formula("^", self, other)
-    def __invert__(self) -> "Formula": return Formula("~", self)
-    def __rshift__(self, other) -> "Formula": return Formula("->", self, other) 
-    def __lshift__(self, other) -> "Formula": return Formula("<-", self, other) 
-    def biimp(self, other) -> "Formula": return Formula("<->", self, other)
-    def ite(self, o1, o2) -> "Formula": return (self & o1) | (~self & o2)
-
-    @cached_property
-    def vars(self) -> set[str]:
-        if self.op == "V": return { self.c1 }
-        elif self.op == "C": return set()
-        else: 
-            ret = set()
-            for c in self.children: ret |= c.vars
-            return ret
-
-    def flip(self, var : str) -> "Formula":
-        if self.op == "V" and self.c1 == var: return Formula("~", self)
-        elif self.op in ["V", "C"]: return copy.copy(self)
-        else: return Formula(self.op, *(c.flip(var) for c in self.children))
     
     def replace(self, d: dict[str, Union["Formula", str]]):
         if self.op == "V" and self.c1 in d: 
             repl = d[self.c1]
-            if isinstance(repl, str): 
-                repl = Formula.parse(repl)
+            if isinstance(repl, str): repl = self.ctx.parse(repl)
             return copy.copy(repl)
         elif self.op in ["V", "C"]: return copy.copy(self)
-        else: return Formula(self.op, *(c.replace(d) for c in self.children))
-
-    def __copy__(self) -> "Formula":
-        return Formula(self.op, *(copy.copy(c) for c in self.children))
-
-    def __hash__(self) -> int:
-        return self.__repr__().__hash__()
+        else: return Formula(self.ctx, self.op, *(c.replace(d) for c in self.children))
 
     def tseitin(self) -> tuple[list[set], dict["Formula", int]]:
         formula = self.simplify()
-        if formula == Formula.zero or formula == Formula.one: 
+        if formula == formula.ctx.false or formula == formula.ctx.true: 
             return [], {}
 
         stack = [formula]
@@ -227,7 +226,7 @@ class Formula:
             if top.op != "V": # recurse if top is not a variable
                 children = top.children
                 if len(top.children) > 2:
-                    children = (top.children[0], Formula(top.op, *top.children[1:]) )
+                    children = (top.children[0], Formula(self.ctx, top.op, *top.children[1:]) )
                 subs.add((top, children))
                 stack += list(children)
         sub2idx = {k: v for v,k in enumerate(sub2idx, start=1)}
@@ -258,6 +257,20 @@ class Formula:
         return cnf, sub2idx
 
 
-SIMP_RULES = [ (Formula.parse(left), Formula.parse(right)) for left,right in SIMP_RULES ]
-Formula.one = Formula.parse("1")
-Formula.zero = Formula.parse("0")
+class FormulaContext(OperableContext):
+    def __init__(self):
+        self.SIMP_RULES = [ (self.parse(l), self.parse(r)) for l,r in _SIMP_RULES ]
+
+    @property
+    def false(self) -> "Operable": 
+        return Formula(self, "C", "0")
+
+    @property
+    def true(self) -> "Operable": 
+        return Formula(self, "C", "1")
+
+    def apply(self, op: str, *children) -> "Formula":
+        return Formula(self, op, *children)
+
+    def var(self, x: str) -> "Operable": 
+        return Formula(self, "V", x)

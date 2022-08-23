@@ -1,107 +1,96 @@
 import os
 from ctypes import CDLL, c_double, c_int, c_char_p, byref, POINTER
-from typing import Iterable, Tuple, Union
+from typing import Tuple, Union
 
-from .formula import Formula
+from .operable import Operable, OperableContext
 
-class BuddyNode:
-	def __init__(self, model : "Buddy", node_id : int):
+class BuddyNode(Operable):
+	def __init__(self, context: "BuddyContext", node_id : int):
+		super().__init__(context)
 		self.node_id = node_id
-		self.model = model 
-		model._bdd.bdd_addref(self.node_id)
+		context._bdd.bdd_addref(self.node_id)
+
+	# --- ABSTRACT METHODS ---
+	def __hash__(self): 
+		return self.node_id.__hash__()
+
+	def cofactor(self, x: str, value: bool) -> "Operable": 
+		xf = self.ctx.var(x)
+		if not value: xf = ~xf
+		return BuddyNode(self.ctx, self.ctx._bdd.bdd_restrict(self.node_id, xf.node_id))
+
+	def flip(self, x : str) -> "BuddyNode":
+		xf = self.ctx.var(x)
+		f0, f1 = self.cofactor(x, False), self.cofactor(x, True)
+		return xf.ite(f0, f1)	
+
+	def __call__(self, assignment: dict[str, bool]) -> bool: 
+		if self == self.ctx.true: return True
+		elif self == self.ctx.false: return False
+		else:
+			sub = self.high if assignment[self.var] else self.low
+			return sub(assignment)
+
+	def __copy__(self): 
+		return BuddyNode(self.ctx, self.node_id)
+
+	@property
+	def vars(self) -> set[str]: 
+		return set(v for v,c in self.var_profile.items() if c > 0)
+
+	# --- END ABSTRACT METHODS ---
+
+	def ite(self, o1: "BuddyNode", o2: "BuddyNode") -> "BuddyNode": 
+		return self.ctx.apply("ite", self, o1, o2)
 
 	def __del__(self):
-		if not self.model.called_done: 
-			self.model._bdd.bdd_delref(self.node_id)
-
-	def __hash__(self): return self.node_id.__hash__()
+		if not self.ctx.called_done: 
+			self.ctx._bdd.bdd_delref(self.node_id)
 
 	def __eq__(self, other : "BuddyNode"): 
-		return isinstance(other, BuddyNode) and \
-			   self.model == other.model and \
-			   self.node_id == other.node_id
-
-	# boolean operations on BDDs
-	def __invert__(self) -> "BuddyNode": 
-		return self.model.apply("~", self)
-
-	def __and__(self, other : "BuddyNode") -> "BuddyNode": 
-		return self.model.apply("&", self, other)
-
-	def __sub__(self, other : "BuddyNode") -> "BuddyNode": 
-		return self & ~other
-
-	def __or__(self, other : "BuddyNode") -> "BuddyNode": 
-		return self.model.apply("|", self, other)
-
-	def __xor__(self, other : "BuddyNode") -> "BuddyNode": 
-		return self.model.apply("^", self, other)
-
-	def __lshift__(self, other : "BuddyNode") -> "BuddyNode": 
-		return self.model.apply("->", self, other)
-
-	def __rshift__(self, other : "BuddyNode") -> "BuddyNode": 
-		return other << self
-
-	def ite(self, if_true : "BuddyNode", if_false : "BuddyNode") -> "BuddyNode": 
-		return self.model.apply("ite", self, if_true, if_false)
-
-	def equiv(self, other : "BuddyNode") -> "BuddyNode": 
-		return self.model.apply("<->", self, other)
-
-	def flip(self, var : str) -> "BuddyNode":
-		xf = self.model.node(var)
-		f0, f1 = self.restrict(~xf), self.restrict(xf)
-		return xf.ite(f0, f1)	
+		return isinstance(other, BuddyNode) and self.node_id == other.node_id
 
 	@property
 	def var(self) -> str:
 		if self.node_id in [0,1]: return None
-		return self.model.vars[self.model._bdd.bdd_var(self.node_id)]
+		return self.ctx.vars[self.ctx._bdd.bdd_var(self.node_id)]
 
 	@property
 	def low(self) -> "BuddyNode": 
-		return BuddyNode(self.model, self.model._bdd.bdd_low(self.node_id))
+		return BuddyNode(self.ctx, self.ctx._bdd.bdd_low(self.node_id))
 
 	@property
 	def high(self) -> "BuddyNode": 
-		return BuddyNode(self.model, self.model._bdd.bdd_high(self.node_id))
+		return BuddyNode(self.ctx, self.ctx._bdd.bdd_high(self.node_id))
 
 	@property
 	def satcount(self) -> int: 
-		return self.model._bdd.bdd_satcount(self.node_id)
+		return self.ctx._bdd.bdd_satcount(self.node_id)
 
 	@property
 	def nodecount(self) -> int:
-		return self.model._bdd.bdd_nodecount(self.node_id)
+		return self.ctx._bdd.bdd_nodecount(self.node_id)
 
 	@property
 	def var_profile(self) -> dict[str, int]:
 		# returns a variable-int-dictionary that counts how often variable nodes occur in this function
-		profile = self.model._bdd.bdd_varprofile(self.node_id)
-		return { var: count for var, count in zip(self.model.vars, profile.contents ) }
-
-	@property 
-	def depends_on(self) -> set[str]:
-		return set(v for v,c in self.var_profile.items() if c > 0)
-
-	def restrict(self, u : "BuddyNode") -> "BuddyNode": 
-		return BuddyNode(self.model, self.model._bdd.bdd_restrict(self.node_id, u.node_id))
-
+		profile = self.ctx._bdd.bdd_varprofile(self.node_id)
+		return { var: count for var, count in zip(self.ctx.vars, profile.contents ) }
+		
 	def dump(self, filename="out.bdd"):
 		if filename[-3:] == "dot":
-			self.model._bdd.bdd_fnprintdot(c_char_p(filename.encode("UTF-8")), self.node_id)
+			self.ctx._bdd.bdd_fnprintdot(c_char_p(filename.encode("UTF-8")), self.node_id)
 		if filename[-3:] == "pdf":
 			tempf = filename+".tmp"
-			self.model._bdd.bdd_fnprintdot(c_char_p(tempf.encode("UTF-8")), self.node_id)
+			self.ctx._bdd.bdd_fnprintdot(c_char_p(tempf.encode("UTF-8")), self.node_id)
 			os.system(f"dot -Tpdf {tempf} > {filename}")
 			os.remove(tempf)
 		else:
-			self.model._bdd.bdd_fnsave(c_char_p(filename.encode("UTF-8")), self.node_id)
+			self.ctx._bdd.bdd_fnsave(c_char_p(filename.encode("UTF-8")), self.node_id)
 			with open(filename+"v", "w") as f:
-				f.write("\n".join(self.model.vars))
+				f.write("\n".join(self.ctx.vars))
 
-class Buddy:
+class BuddyContext(OperableContext):
 	def __init__(self, vars: list[str], lib:str ="/usr/local/lib/libbdd.so") -> None: 
 		buddy = CDLL(lib)
 
@@ -120,6 +109,39 @@ class Buddy:
 		self.__vars = tuple(vars)
 		self.__name2var_id = { x : k for k, x in enumerate(self.vars) }
 		self.__called_done = False
+
+	# --- ABSTRACT METHODS ---
+
+	@property
+	def false(self) -> BuddyNode:
+		return BuddyNode(self, self._bdd.bdd_false())
+
+	@property
+	def true(self) -> BuddyNode:
+		return BuddyNode(self, self._bdd.bdd_true())
+
+	def apply(self, op : str, *children) -> BuddyNode:
+		if op in ('~'):
+			u, = children
+			return BuddyNode(self,  self._bdd.bdd_not(u.node_id))
+		elif len(children)==2:
+			u, v = children
+			if op in ('|'): return BuddyNode(self,  self._bdd.bdd_or(u.node_id, v.node_id))
+			elif op in ('&'): return BuddyNode(self,  self._bdd.bdd_and(u.node_id, v.node_id))
+			elif op in ('^'): return BuddyNode(self,  self._bdd.bdd_xor(u.node_id, v.node_id))
+			elif op in ('->'): return BuddyNode(self,  self._bdd.bdd_imp(u.node_id, v.node_id))
+			elif op in ('<->'): return BuddyNode(self,  self._bdd.bdd_biimp(u.node_id, v.node_id))
+		elif len(children) == 3 and op == "ite":
+			u, v, w = children
+			return BuddyNode(self,  self._bdd.bdd_ite(u.node_id, v.node_id, w.node_id))
+		raise Exception(f"operator {op} and children count #{len(children)} do not fit")
+
+	def var(self, x: str) -> "BuddyNode": 
+		if x not in self.__name2var_id.keys():
+			raise Exception(f"Variable {x} not found!")
+		return BuddyNode(self, self._bdd.bdd_ithvar(self.__name2var_id[x]))
+
+	# --- END ABSTRACT METHODS ---
 
 	def swap_vars(self, v1, v2):
 		assert v1 in self.__name2var_id
@@ -144,63 +166,12 @@ class Buddy:
 	def nodenum(self) -> int:
 		return self._bdd.bdd_getnodenum()
 
-	def node(self, formula: Union[Formula, str]) -> BuddyNode:
-		if isinstance(formula, str): formula = Formula.parse(formula)
-
-		if formula.op == "C" and formula.c1 == "1":
-			return BuddyNode(self, self.true)
-		elif formula.op == "C" and formula.c1 == "0":
-			return BuddyNode(self, self.false)
-		elif formula.op == "V":
-			if formula.c1 not in self.__name2var_id.keys():
-				raise Exception(f"Variable {formula.c1} not found!")
-			return BuddyNode(self, self._bdd.bdd_ithvar(self.__name2var_id[formula.c1]))
-		elif formula.op == "~":
-			return self.apply("~", self.node(formula.c1))
-		else:
-			nodes = [ self.node(c) for c in formula.children ]
-			result = nodes[0] 
-			for right in nodes[1:]:
-				result = self.apply(formula.op, result, right)
-			return result
-
-
 	def __enter__(self): 
 		return self
 
 	def __exit__(self, exc_type, exc_value, exc_traceback): 
 		self._bdd.bdd_done()
 		self.__called_done =True
-
-	@property
-	def false(self) -> BuddyNode:
-		return BuddyNode(self, self._bdd.bdd_false())
-
-	@property
-	def true(self) -> BuddyNode:
-		return BuddyNode(self, self._bdd.bdd_true())
-
-	def apply(self, op : str, u : BuddyNode, v : BuddyNode = None, w : BuddyNode = None) -> BuddyNode:
-		result = None	
-		if op in ('~', 'not', '!'):
-			result =  self._bdd.bdd_not(u.node_id)
-		elif op in ('or', r'\/', '|', '||'):
-			result =  self._bdd.bdd_or(u.node_id, v.node_id)
-		elif op in ('and', '/\\', '&', '&&', "band", "*", "land", "."):
-			result =  self._bdd.bdd_and(u.node_id, v.node_id)
-		elif op in ('xor', '^'):
-			result =  self._bdd.bdd_xor(u.node_id, v.node_id)
-		elif op in ('=>', '->', 'implies'):
-			result =  self._bdd.bdd_imp(u.node_id, v.node_id)
-		elif op in ('<=>', '<->', 'equiv'):
-			result =  self._bdd.bdd_biimp(u.node_id, v.node_id)
-		elif op in ('diff', '-'):
-			result =  self._bdd.bdd_ite(u.node_id, self._bdd.bdd_not(u.node_id), self.false.node_id)
-		elif op == 'ite':
-			result =  self._bdd.bdd_ite(u.node_id, v.node_id, w.node_id)
-		else:
-			raise Exception(f'Unknown operator "{op}"')
-		return BuddyNode(self, result)
 
 	def set_dynamic_reordering(self, type=True):
 		if type:
@@ -227,11 +198,11 @@ class Buddy:
 		# 	print(var, self._bdd.bdd_var2level(self.__name2var_id[var]))
 
 	@classmethod
-	def load(file_bdd, vars) -> Tuple["Buddy", BuddyNode]:
+	def load(file_bdd, vars) -> Tuple["BuddyContext", BuddyNode]:
 		# returns new root node of read bdd
 		# print(f"load {file_bdd} ...")
 		root = c_int()
-		buddy = Buddy(vars)
+		buddy = BuddyContext(vars)
 		buddy._bdd.bdd_fnload(c_char_p(file_bdd.encode("UTF-8")), byref(root))
 		buddy._bdd.bdd_addref(root.value)
 		# print(f"loaded {file_bdd}")

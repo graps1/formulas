@@ -32,8 +32,8 @@ class GPMC:
                  debug=False, exists=set()):
         if isinstance(cnf, Formula):
             cnf = cnf.simplify()
-            if cnf == Formula.zero: return 0
-            if cnf == Formula.one: return 1
+            if cnf == cnf.ctx.false: return 0
+            if cnf == cnf.ctx.true: return 1
             orig_vars = cnf.vars
             cnf, var2idx = cnf.tseitin() # create cnf encoding
             var2idx = { str(k): v for k,v in var2idx.items() } # map keys from Formula to str

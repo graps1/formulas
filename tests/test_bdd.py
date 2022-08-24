@@ -20,10 +20,10 @@ def test_bdd():
 
         f = model.parse("x & (y | z)")
         assert f.nodecount == 3
-        assert f.satcount == 3 
+        assert f.satcount() == 3 
 
         h = f & y
-        assert h.satcount == 2 
+        assert h.satcount() == 2 
 
         fx = f.flip("x")
         assert fx == model.parse("~x & (y | z)") 

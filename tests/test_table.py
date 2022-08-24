@@ -19,8 +19,8 @@ def test_operations():
     assert t4_1 == ctx.var("y") 
     assert t4_0 != ctx.false # variables don't agree!
 
-    assert table.satcount == 2
-    assert table1.satcount == 3
+    assert table.satcount() == 2
+    assert table1.satcount() == 3
 
     primes = table1.prime_implicants()
     assert len(primes) == 2 and \

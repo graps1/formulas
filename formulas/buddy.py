@@ -14,14 +14,17 @@ class BuddyNode(Repr):
 	def __hash__(self): 
 		return self.node_id.__hash__()
 
-	def cofactor(self, x: str, value: bool) -> "Repr": 
-		xf = self.ctx.var(x)
-		if not value: xf = ~xf
-		return BuddyNode(self.ctx, self.ctx._bdd.bdd_restrict(self.node_id, xf.node_id))
+	def cofactor(self, ass: dict[str, bool]) -> "Repr": 
+		r = self.ctx.true
+		for x in ass:
+			xf = self.ctx.var(x)
+			if not ass[x]: xf = ~xf
+			r = r & xf
+		return BuddyNode(self.ctx, self.ctx._bdd.bdd_restrict(self.node_id, r.node_id))
 
 	def flip(self, x : str) -> "BuddyNode":
 		xf = self.ctx.var(x)
-		f0, f1 = self.cofactor(x, False), self.cofactor(x, True)
+		f0, f1 = self.cofactor({x: False}), self.cofactor({x: True})
 		return xf.ite(f0, f1)	
 
 	def __call__(self, assignment: dict[str, bool]) -> bool: 

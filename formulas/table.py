@@ -29,13 +29,13 @@ class Table(Repr):
     def __copy__(self): 
         return Table(self, self.ctx, self.table.copy(), self.vars.copy())
 
-    def cofactor(self, x: str, value: bool) -> "Table": 
+    def cofactor(self, ass: dict[str, bool]) -> "Table": 
         new_vars = self.vars.copy()
-        new_vars.remove(x)
+        for x in ass: new_vars.remove(x)
         table = Table(self.ctx, [0 for _ in range(2**len(new_vars))], new_vars)
-        for ass in iter_assignments(new_vars):
-            idx = table.assignment2idx(ass)
-            table.table[idx] = self(ass | { x: value })
+        for u in iter_assignments(new_vars):
+            idx = table.assignment2idx(u)
+            table.table[idx] = self(u | ass)
         return table
 
     def flip(self, x: str) -> "Table": 

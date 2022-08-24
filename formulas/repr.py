@@ -19,7 +19,7 @@ class Repr(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def cofactor(self, x: str, value: bool) -> "Repr": 
+    def cofactor(self, ass: dict[str, bool]) -> "Repr": 
         raise NotImplementedError()
 
     @abstractmethod

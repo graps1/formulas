@@ -51,7 +51,7 @@ def test_cofactor():
     ]
     ctx = FormulaContext()
     for form, res in formula_result_pairs: 
-        assert ctx.parse(form).cofactor("x", True) == ctx.parse(res)
+        assert ctx.parse(form).cofactor({"x": True}) == ctx.parse(res)
 
 def test_tseitin():
     ctx = FormulaContext()

@@ -102,10 +102,13 @@ class Formula(Repr):
     def __copy__(self) -> "Formula":
         return Formula(self.ctx, self.op, *(copy.copy(c) for c in self.children))
 
-    def cofactor(self, var : str, val : bool) -> "Formula":
-        if self.op == "V" and self.c1 == var: return self.ctx.true if val else self.ctx.false
-        elif self.op in ["V", "C"]: return copy.copy(self)
-        else: return Formula(self.ctx, self.op, *(c.cofactor(var, val) for c in self.children))
+    def cofactor(self, ass: dict[str, int]) -> "Formula":
+        if self.op == "V" and self.c1 in ass: 
+            return self.ctx.true if ass[self.c1] else self.ctx.false
+        elif self.op in ["V", "C"]: 
+            return copy.copy(self)
+        else: 
+            return Formula(self.ctx, self.op, *(c.cofactor(ass) for c in self.children))
 
     def flip(self, var : str) -> "Formula":
         if self.op == "V" and self.c1 == var: return Formula(self.ctx, "~", self)

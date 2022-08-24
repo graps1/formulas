@@ -28,8 +28,8 @@ def test_bdd():
         fx = f.flip("x")
         assert fx == model.parse("~x & (y | z)") 
 
-        f1 = f.cofactor("x", True)
-        f0 = f.cofactor("x", False)
+        f1 = f.cofactor({"x": True})
+        f0 = f.cofactor({"x": False})
         assert f1 == model.parse("y | z")
         assert f0 == model.false
 

@@ -27,7 +27,7 @@ class Table(Repr):
         return tuple(self.table).__hash__() + tuple(self.vars).__hash__()
 
     def __copy__(self): 
-        return Table(self, self.ctx, self.table.copy(), self.vars.copy())
+        return Table(self.ctx, self.table.copy(), self.vars.copy())
 
     def cofactor(self, ass: dict[str, bool]) -> "Table": 
         new_vars = self.vars.copy()

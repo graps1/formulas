@@ -1,4 +1,5 @@
 from formulas import Table, TableContext
+import copy
 
 def test_operations():
     ctx = TableContext(print_mode="primes")
@@ -26,3 +27,6 @@ def test_operations():
     assert len(primes) == 2 and \
            {"x": True, "y": True} in primes and \
            {"x": True, "z": True} in primes
+
+    cpy = copy.copy(table1)
+    assert cpy == table1

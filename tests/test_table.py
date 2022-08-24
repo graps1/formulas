@@ -1,7 +1,7 @@
 from formulas import Table, TableContext
 
 def test_operations():
-    ctx = TableContext()
+    ctx = TableContext(print_mode="primes")
     table = Table(ctx, [False, True, True, False], ["x", "y"])
     assert table.assignment2idx({"x": True, "y": True}) == 3
     assert table.assignment2idx({"x": True, "y": False}) == 2 
@@ -20,3 +20,8 @@ def test_operations():
 
     assert table.satcount == 2
     assert table1.satcount == 3
+
+    primes = table1.prime_implicants()
+    assert len(primes) == 2 and \
+           {"x": True, "y": True} in primes and \
+           {"x": True, "z": True} in primes

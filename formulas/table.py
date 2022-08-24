@@ -1,9 +1,9 @@
 from typing import Iterable
-from .operable import Operable, OperableContext
+from .operable import Repr, ReprContext
 from .utils import iter_assignments
 import copy
 
-class Table(Operable):
+class Table(Repr):
     def __init__(self, context: "TableContext", table: list[int], vars: list[str]):
         super().__init__(context)
         self.__table = table
@@ -129,7 +129,7 @@ class Table(Operable):
                 if new not in us: us.append(new)
         return us
 
-class TableContext(OperableContext):
+class TableContext(ReprContext):
     def __init__(self, print_mode="table"):
         assert print_mode in ["table", "primes"], print_mode
         self.__print_mode = print_mode

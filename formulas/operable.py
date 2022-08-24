@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from . import parser
 
-class Operable(ABC):
+class Repr(ABC):
 
-    def __init__(self, context: "OperableContext") -> None:
+    def __init__(self, context: "ReprContext") -> None:
         self.ctx = context 
 
     @abstractmethod
@@ -19,11 +19,11 @@ class Operable(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def cofactor(self, x: str, value: bool) -> "Operable": 
+    def cofactor(self, x: str, value: bool) -> "Repr": 
         raise NotImplementedError()
 
     @abstractmethod
-    def flip(self, x: str) -> "Operable": 
+    def flip(self, x: str) -> "Repr": 
         raise NotImplementedError()
 
     @property
@@ -31,34 +31,34 @@ class Operable(ABC):
     def vars(self) -> set[str]: 
         raise NotImplementedError()
 
-    def __or__(self, other: "Operable") -> "Operable": return self.ctx.apply("|", self, other)
-    def __and__(self, other: "Operable") -> "Operable": return self.ctx.apply("&", self, other)
-    def __xor__(self, other: "Operable") -> "Operable": return self.ctx.apply("^", self, other)
-    def __rshift__(self, other: "Operable") -> "Operable": return self.ctx.apply("->", self, other)
-    def __lshift__(self, other: "Operable") -> "Operable": return self.ctx.apply("<-", self, other)
+    def __or__(self, other: "Repr") -> "Repr": return self.ctx.apply("|", self, other)
+    def __and__(self, other: "Repr") -> "Repr": return self.ctx.apply("&", self, other)
+    def __xor__(self, other: "Repr") -> "Repr": return self.ctx.apply("^", self, other)
+    def __rshift__(self, other: "Repr") -> "Repr": return self.ctx.apply("->", self, other)
+    def __lshift__(self, other: "Repr") -> "Repr": return self.ctx.apply("<-", self, other)
     def __invert__(self): return self.ctx.apply("~", self)
-    def biimp(self, other: "Operable") -> "Operable": return self.ctx.apply("<->", self, other)
+    def biimp(self, other: "Repr") -> "Repr": return self.ctx.apply("<->", self, other)
 
-class OperableContext(ABC):
+class ReprContext(ABC):
     @property
     @abstractmethod
-    def false(self) -> "Operable": 
+    def false(self) -> "Repr": 
         raise NotImplementedError()
 
     @property
     @abstractmethod
-    def true(self) -> "Operable": 
+    def true(self) -> "Repr": 
         raise NotImplementedError()
 
     @abstractmethod
-    def apply(self, op: str, *children) -> "Operable":
+    def apply(self, op: str, *children) -> "Repr":
         raise NotImplementedError() 
 
     @abstractmethod
-    def var(self, x: str) -> "Operable": 
+    def var(self, x: str) -> "Repr": 
         raise NotImplementedError()
 
-    def parse(self, formula: str) -> "Operable":
+    def parse(self, formula: str) -> "Repr":
         def rec(parsed):
             op, args = parsed[0], parsed[1:]
             if op == "C" and args[0] == "0": return self.false

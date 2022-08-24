@@ -1,4 +1,4 @@
-from .operable import Operable, OperableContext
+from .operable import Repr, ReprContext
 from .parser import OPERATIONS, PRECEDENCE
 from typing import Union
 import copy
@@ -57,7 +57,7 @@ _SIMP_RULES = [
     ("A <-> 1", "A"),
 ]
 
-class Formula(Operable):
+class Formula(Repr):
     def __init__(self, ctx: "FormulaContext", op=None, *children):
         super().__init__(ctx)
 
@@ -257,20 +257,20 @@ class Formula(Operable):
         return cnf, sub2idx
 
 
-class FormulaContext(OperableContext):
+class FormulaContext(ReprContext):
     def __init__(self):
         self.SIMP_RULES = [ (self.parse(l), self.parse(r)) for l,r in _SIMP_RULES ]
 
     @property
-    def false(self) -> "Operable": 
+    def false(self) -> "Repr": 
         return Formula(self, "C", "0")
 
     @property
-    def true(self) -> "Operable": 
+    def true(self) -> "Repr": 
         return Formula(self, "C", "1")
 
     def apply(self, op: str, *children) -> "Formula":
         return Formula(self, op, *children)
 
-    def var(self, x: str) -> "Operable": 
+    def var(self, x: str) -> "Repr": 
         return Formula(self, "V", x)

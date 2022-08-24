@@ -2,9 +2,9 @@ import os
 from ctypes import CDLL, c_double, c_int, c_char_p, byref, POINTER
 from typing import Tuple, Union
 
-from .operable import Operable, OperableContext
+from .operable import Repr, ReprContext
 
-class BuddyNode(Operable):
+class BuddyNode(Repr):
 	def __init__(self, context: "BuddyContext", node_id : int):
 		super().__init__(context)
 		self.node_id = node_id
@@ -14,7 +14,7 @@ class BuddyNode(Operable):
 	def __hash__(self): 
 		return self.node_id.__hash__()
 
-	def cofactor(self, x: str, value: bool) -> "Operable": 
+	def cofactor(self, x: str, value: bool) -> "Repr": 
 		xf = self.ctx.var(x)
 		if not value: xf = ~xf
 		return BuddyNode(self.ctx, self.ctx._bdd.bdd_restrict(self.node_id, xf.node_id))
@@ -90,7 +90,7 @@ class BuddyNode(Operable):
 			with open(filename+"v", "w") as f:
 				f.write("\n".join(self.ctx.vars))
 
-class BuddyContext(OperableContext):
+class BuddyContext(ReprContext):
 	def __init__(self, vars: list[str], lib:str ="/usr/local/lib/libbdd.so") -> None: 
 		buddy = CDLL(lib)
 

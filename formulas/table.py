@@ -89,10 +89,10 @@ class Table(Repr):
         return isinstance(other, Table) and \
                other.ctx == self.ctx and \
                set(other.vars) == set(self.vars) and \
-               all(other[ass] <= self[ass] for ass in iter_assignments(self.vars))
+               all(self[ass] <= other[ass] for ass in iter_assignments(self.vars))
 
     def __ge__(self, other):
-        other <= self
+        return other <= self
 
     def __eq__(self, other):
         return other <= self and self <= other

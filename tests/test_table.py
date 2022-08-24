@@ -10,8 +10,8 @@ def test_operations():
     table1 = ctx.parse("x & (y | z)")
     table2 = ctx.parse("x & y & z")
     table3 = ctx.parse("(y | z) & x")
-    assert table1 <= table2
-    assert not (table2 <= table1)
+    assert table2 <= table1
+    assert table1 >= table2
     assert table3 == table1
 
     table4 = ctx.parse("x & y")

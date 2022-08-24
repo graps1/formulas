@@ -73,11 +73,15 @@ class Table(Operable):
         return table_index
 
     def __repr__(self):
-        ret = " ".join(self.vars) + " f" + "\n" + "-"*(len(self.vars)*2+1) 
-        for ass in iter_assignments(self.vars):
-            ret += "\n" + " ".join({True: "1", False: "0"}[ass[x]] for x in self.vars)
-            ret += " " + str(int(self(ass)))
-        ret += "\n"
+        if self.ctx.print_mode == "table":
+            ret = " ".join(self.vars) + " f" + "\n" + "-"*(len(self.vars)*2+1) 
+            for ass in iter_assignments(self.vars):
+                ret += "\n" + " ".join({True: "1", False: "0"}[ass[x]] for x in self.vars)
+                ret += " " + str(int(self(ass)))
+            ret += "\n"
+        else:
+            primes = self.prime_implicants()
+            ret = " | ".join("".join(k if v else k+"'" for k,v in p.items()) for p in primes)
         return ret
 
     def __le__(self, other):
@@ -95,7 +99,45 @@ class Table(Operable):
     def __ne__(self, other):
         return not (other == self)
 
+    def prime_implicants(self) -> list[dict[str, int]]:
+        assert 0 < self.satcount < 2**len(self.vars), "function is constant!"
+
+        us = [ ass for ass in iter_assignments(self.vars) if self[ass] == 1 ] 
+        while True:
+            # select resolvents
+            marked = []
+            for u1 in us:
+                for u2 in us:
+                    # check if they can be resolved, i.e. if there exists EXACTLY one variable 
+                    # that occurs negatively in u1 and positively in u2 (or vice versa)
+                    # and all other variables have the same value
+                    if set(u1.keys()) != set(u2.keys()): continue 
+                    difference = [ var for var in u1 if u1[var] != u2[var] ]
+                    if len(difference) == 1:
+                        # mark for resolution
+                        marked.append((u1, u2, difference[0]))
+
+            # if resolvents exists.... resolve. otherwise, stop.
+            if len(marked) == 0:
+                break
+
+            for (res1, res2, targetvar) in marked:
+                if res1 in us: us.remove(res1)
+                if res2 in us: us.remove(res2)
+                new = res1.copy()
+                del new[targetvar]
+                if new not in us: us.append(new)
+        return us
+
 class TableContext(OperableContext):
+    def __init__(self, print_mode="table"):
+        assert print_mode in ["table", "primes"], print_mode
+        self.__print_mode = print_mode
+
+    @property 
+    def print_mode(self):
+        return self.__print_mode
+
     @property
     def false(self) -> "Table": 
         return Table(self, [False], [])

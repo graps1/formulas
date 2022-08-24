@@ -80,6 +80,8 @@ class Table(Repr):
                 ret += " " + str(int(self(ass)))
             ret += "\n"
         else:
+            if self.satcount == 0: return "0"
+            elif self.satcount == 2**len(self.vars): return "1"
             primes = self.prime_implicants()
             ret = " | ".join("".join(k if v else k+"'" for k,v in p.items()) for p in primes)
         return ret

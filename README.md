@@ -99,6 +99,8 @@ To instantiate the solver, you need to specify the solver's location. Mine is at
 
 In the last example $\exists y. (x \land (y \lor z)) = x \lor (x \land z)$, only the two assignments $x=1, z=0$ and $x=1, z=1$ are counted.
 
+...
+
 
 ## BDDs / Buddy
 

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Iterable
 from . import parser
+from .utils import iter_assignments
 
 class Repr(ABC):
 
@@ -30,6 +32,10 @@ class Repr(ABC):
     @abstractmethod 
     def vars(self) -> set[str]: 
         raise NotImplementedError()
+
+    def branch(self, *vars: list[str]) -> list["Repr"]:
+        for ass in iter_assignments(vars):
+            yield self.cofactor(ass)
 
     def __or__(self, other: "Repr") -> "Repr": return self.ctx.apply("|", self, other)
     def __and__(self, other: "Repr") -> "Repr": return self.ctx.apply("&", self, other)

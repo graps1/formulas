@@ -1,5 +1,5 @@
 from typing import Iterable
-from .operable import Repr, ReprContext
+from .repr import Repr, ReprContext
 from .utils import iter_assignments
 import copy
 

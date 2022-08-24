@@ -2,7 +2,7 @@ import os
 from ctypes import CDLL, c_double, c_int, c_char_p, byref, POINTER
 from typing import Tuple, Union
 
-from .operable import Repr, ReprContext
+from .repr import Repr, ReprContext
 
 class BuddyNode(Repr):
 	def __init__(self, context: "BuddyContext", node_id : int):

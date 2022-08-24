@@ -1,4 +1,4 @@
-from .operable import Repr, ReprContext
+from .repr import Repr, ReprContext
 from .parser import OPERATIONS, PRECEDENCE
 from typing import Union
 import copy

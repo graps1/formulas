@@ -1,3 +1,4 @@
+from .gpmc import GPMC
 from .repr import Repr, ReprContext
 from .parser import OPERATIONS, PRECEDENCE
 from typing import Union
@@ -123,6 +124,22 @@ class Formula(Repr):
             ret = set()
             for c in self.children: ret |= c.vars
             return ret
+
+    def satcount(self, exists=set()):
+        simp = self.simplify()
+        if simp == simp.ctx.false: return 0
+        if simp == simp.ctx.true: return 1 # trivial cases
+
+        cnf, sub2idx = simp.tseitin() # create cnf encoding
+
+        all_vars_ids = set(sub2idx.values())
+        orig_vars_ids = { sub2idx[self.ctx.var(x)] for x in simp.vars }
+        exists_vars_ids = { sub2idx[self.ctx.var(x)] for x in exists }
+
+        # existentially quantifies new tseitin variables + those that are explicitly specified
+        # we have: tseitin vars ids = all_vars_ids - orig_vars_ids
+        exists_ids = (all_vars_ids - orig_vars_ids) | exists_vars_ids
+        return self.ctx.solver.satcount(cnf, exists=exists_ids)
 
     # --- END ABSTRACT METHODS ---
 
@@ -261,8 +278,13 @@ class Formula(Repr):
 
 
 class FormulaContext(ReprContext):
-    def __init__(self):
+    def __init__(self, solver: GPMC = None):
         self.SIMP_RULES = [ (self.parse(l), self.parse(r)) for l,r in _SIMP_RULES ]
+        self.__solver = solver
+
+    @property 
+    def solver(self) -> GPMC:
+        return self.__solver
 
     @property
     def false(self) -> "Repr": 

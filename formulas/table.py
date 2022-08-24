@@ -44,11 +44,10 @@ class Table(Repr):
             table[ass] = self(ass | { x: not ass[x] })
         return table
 
-    # --- END ABSTRACT METHODS ---
-
-    @property
     def satcount(self):
         return sum(self.table)
+
+    # --- END ABSTRACT METHODS ---
 
     def __setitem__(self, key, val):
         if isinstance(key, dict): 
@@ -80,8 +79,8 @@ class Table(Repr):
                 ret += " " + str(int(self(ass)))
             ret += "\n"
         else:
-            if self.satcount == 0: return "0"
-            elif self.satcount == 2**len(self.vars): return "1"
+            if self.satcount() == 0: return "0"
+            elif self.satcount() == 2**len(self.vars): return "1"
             primes = self.prime_implicants()
             ret = " | ".join("".join(k if v else k+"'" for k,v in p.items()) for p in primes)
         return ret
@@ -102,7 +101,7 @@ class Table(Repr):
         return not (other == self)
 
     def prime_implicants(self) -> list[dict[str, int]]:
-        assert 0 < self.satcount < 2**len(self.vars), "function is constant!"
+        assert 0 < self.satcount() < 2**len(self.vars), "function is constant!"
 
         us = [ ass for ass in iter_assignments(self.vars) if self[ass] == 1 ] 
         while True:

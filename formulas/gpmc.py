@@ -1,7 +1,5 @@
 import os
 import re
-from typing import Union
-from .formula import Formula
 from .utils import cnf2dimacs
 
 class GPMC:
@@ -28,18 +26,8 @@ class GPMC:
         satcount = int(float(re.findall(r"c s exact arb int (.*)", ret)[0]))
         return satcount 
 
-    def satcount(self, cnf: Union[Formula, list[list[int]]], \
+    def satcount(self, cnf: list[list[int]], \
                  debug=False, exists=set()):
-        if isinstance(cnf, Formula):
-            cnf = cnf.simplify()
-            if cnf == cnf.ctx.false: return 0
-            if cnf == cnf.ctx.true: return 1
-            orig_vars = cnf.vars
-            cnf, var2idx = cnf.tseitin() # create cnf encoding
-            var2idx = { str(k): v for k,v in var2idx.items() } # map keys from Formula to str
-            tseitin_vars = set(var2idx.keys()) - orig_vars
-            exists = tseitin_vars | exists # add tseitin variables
-            exists = { var2idx[p] for p in exists } # to index
         with open(self.__tmp_filename, "w") as fw:
             nr_vars = max(max(abs(lit) for lit in cl) for cl in cnf)
             all_vars = set(range(1, nr_vars+1))

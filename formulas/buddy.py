@@ -41,6 +41,9 @@ class BuddyNode(Repr):
 	def vars(self) -> set[str]: 
 		return set(v for v,c in self.var_profile.items() if c > 0)
 
+	def satcount(self) -> int: 
+		return self.ctx._bdd.bdd_satcount(self.node_id)
+
 	# --- END ABSTRACT METHODS ---
 
 	def ite(self, o1: "BuddyNode", o2: "BuddyNode") -> "BuddyNode": 
@@ -65,10 +68,6 @@ class BuddyNode(Repr):
 	@property
 	def high(self) -> "BuddyNode": 
 		return BuddyNode(self.ctx, self.ctx._bdd.bdd_high(self.node_id))
-
-	@property
-	def satcount(self) -> int: 
-		return self.ctx._bdd.bdd_satcount(self.node_id)
 
 	@property
 	def nodecount(self) -> int:

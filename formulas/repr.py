@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Iterable
 from . import parser
 from .utils import iter_assignments
 
@@ -31,6 +30,10 @@ class Repr(ABC):
     @property
     @abstractmethod 
     def vars(self) -> set[str]: 
+        raise NotImplementedError()
+
+    @abstractmethod 
+    def satcount(self) -> int:
         raise NotImplementedError()
 
     def branch(self, *vars: list[str]) -> list["Repr"]:

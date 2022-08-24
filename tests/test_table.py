@@ -15,8 +15,9 @@ def test_operations():
     assert table3 == table1
 
     table4 = ctx.parse("x & y")
-    assert table4.cofactor({"x": True}) == ctx.var("y") 
-    assert table4.cofactor({"x": False}) != ctx.false # variables don't agree!
+    t4_0, t4_1 = table4.branch("x")
+    assert t4_1 == ctx.var("y") 
+    assert t4_0 != ctx.false # variables don't agree!
 
     assert table.satcount == 2
     assert table1.satcount == 3
